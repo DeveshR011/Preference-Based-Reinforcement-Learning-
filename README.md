@@ -58,15 +58,22 @@ $$\mathcal{L}(\theta_i) = -\mathbb{E}_{(A, B, y)} \left[ y \log P_{\theta_i}(A \
 ---
 
 ### SAC Reward & Uncertainty
-To encourage risk-averse behavior or exploration, we derive the final reward for the Soft Actor-Critic (SAC) agent from the ensemble ($M=3$) statistics of $\hat{R}_{\theta_i}(s_t, a_t)$:
+
+To encourage risk-averse behavior or exploration, we derive the final reward for the Soft Actor-Critic (SAC) agent from the ensemble ($M=3$) statistics of the predicted reward $\hat{R}_{\theta_i}(s_t, a_t)$:
 
 **Ensemble Statistics:**
-$$\mu_t = \frac{1}{M} \sum_{i=1}^M \hat{R}_{\theta_i}(s_t, a_t) \quad , \quad \sigma_t = \text{Std}(\hat{R}_{\theta_1}, \dots, \hat{R}_{\theta_M})$$
+
+$$
+\mu_t = \frac{1}{M} \sum_{i=1}^M \hat{R}_{\theta_i}(s_t, a_t) \quad , \quad \sigma_t = \mathrm{Std}(\hat{R}_{\theta_1}, \dots, \hat{R}_{\theta_M})
+$$
 
 **Final Reward Mapping:**
 We apply an **Uncertainty Penalty** ($\lambda = 0.1$) to the mean reward:
 
-$$r_t = \mu_t - \lambda \sigma_t$$
+$$
+r_t = \mu_t - \lambda \sigma_t
+$$
+
 ## 3. System Architecture
 
 ```mermaid
