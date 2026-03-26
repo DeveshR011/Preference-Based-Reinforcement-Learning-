@@ -24,53 +24,49 @@ Instead of feeding true environment reward to SAC, we:
 
 ## 2. Mathematical Formulation
 
-### Oracle Peak-End utility
-For a segment `tau = {(s_t, a_t, R_true_t)}_{t=1..K}`:
+This project implements a **Peak-End Utility** model for Reinforcement Learning from Human Feedback (RLHF), where the agent's reward is biased toward the maximum and final experiences of a trajectory.
 
-\[
-U_{true}(\tau) = 0.7 \cdot \max_t R_{true}(s_t, a_t) + 0.3 \cdot R_{true}(s_K, a_K)
-\]
+### Oracle Peak-End Utility
+The "ground truth" utility for a segment $\tau = \{(s_t, a_t, R_{true, t})\}_{t=1..K}$ is defined by a weighted sum of the **Peak** reward and the **End** reward:
 
-Preference label:
-- `y = 1` if `U_true(tau_A) > U_true(tau_B)`
-- else `y = 0`
-- plus 10% label flip noise.
+$$U_{true}(\tau) = 0.7 \cdot \max_{t \in [1, K]} R_{true}(s_t, a_t) + 0.3 \cdot R_{true}(s_K, a_K)$$
 
-### Learned utility (per ensemble member)
-For reward predictor `R_hat_theta_i`:
-
-\[
-U_{\theta_i}(\tau) = \omega_1 \cdot \max_t \hat{R}_{\theta_i}(s_t,a_t) + \omega_2 \cdot \hat{R}_{\theta_i}(s_K,a_K)
-\]
-
-with learnable `omega_1, omega_2` initialized to `0.5`.
-
-### Bradley-Terry probability
-
-\[
-P_{\theta_i}(\tau_A \succ \tau_B) = \frac{\exp(U_{\theta_i}(\tau_A))}{\exp(U_{\theta_i}(\tau_A))+\exp(U_{\theta_i}(\tau_B))}
-\]
-
-### Preference loss
-
-\[
-\mathcal{L}(\theta_i) = -\mathbb{E}_{(A,B,y)}\left[y\log P_{\theta_i}(A\succ B) + (1-y)\log P_{\theta_i}(B\succ A)\right]
-\]
-
-### SAC reward from ensemble uncertainty
-Given `M=3` member predictions on the current `(s_t, a_t)`:
-
-\[
-\mu_t = \frac{1}{M}\sum_{i=1}^M \hat{R}_{\theta_i}(s_t,a_t), \quad
-\sigma_t = \operatorname{Std}(\hat{R}_{\theta_1},...,\hat{R}_{\theta_M})
-\]
-
-\[
-r_t = \mu_t - \lambda \sigma_t, \quad \lambda=0.1
-\]
+**Preference Labeling:**
+For any pair of segments $(\tau_A, \tau_B)$, the preference label $y$ is generated as:
+* $y = 1$ if $U_{true}(\tau_A) > U_{true}(\tau_B)$
+* $y = 0$ otherwise
+* *Note: A 10% label flip noise is applied to simulate human inconsistency.*
 
 ---
 
+### Learned Utility (Ensemble)
+For each reward predictor $\hat{R}_{\theta_i}$ in an ensemble, we learn a utility function $U_{\theta_i}(\tau)$. We treat the weights $\omega_1$ and $\omega_2$ as learnable parameters (initialized at $0.5$):
+
+$$U_{\theta_i}(\tau) = \omega_1 \cdot \max_t \hat{R}_{\theta_i}(s_t, a_t) + \omega_2 \cdot \hat{R}_{\theta_i}(s_K, a_K)$$
+
+---
+
+### Preference Learning
+We use the **Bradley-Terry Model** to estimate the probability that segment $A$ is preferred over segment $B$:
+
+$$P_{\theta_i}(\tau_A \succ \tau_B) = \frac{\exp(U_{\theta_i}(\tau_A))}{\exp(U_{\theta_i}(\tau_A)) + \exp(U_{\theta_i}(\tau_B))}$$
+
+The model is optimized using the **Cross-Entropy Loss**:
+
+$$\mathcal{L}(\theta_i) = -\mathbb{E}_{(A, B, y)} \left[ y \log P_{\theta_i}(A \succ B) + (1-y) \log P_{\theta_i}(B \succ A) \right]$$
+
+---
+
+### SAC Reward & Uncertainty
+To encourage risk-averse behavior or exploration, we derive the final reward for the Soft Actor-Critic (SAC) agent from the ensemble ($M=3$) statistics of $\hat{R}_{\theta_i}(s_t, a_t)$:
+
+**Ensemble Statistics:**
+$$\mu_t = \frac{1}{M} \sum_{i=1}^M \hat{R}_{\theta_i}(s_t, a_t) \quad , \quad \sigma_t = \text{Std}(\hat{R}_{\theta_1}, \dots, \hat{R}_{\theta_M})$$
+
+**Final Reward Mapping:**
+We apply an **Uncertainty Penalty** ($\lambda = 0.1$) to the mean reward:
+
+$$r_t = \mu_t - \lambda \sigma_t$$
 ## 3. System Architecture
 
 ```mermaid
